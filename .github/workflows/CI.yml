@@ -63,10 +63,12 @@ jobs:
         include:
           - name: x64
             runner: windows-latest
-            run-hooks: true
+            install_env: true
+            run_hooks: true
           - name: arm64
             runner: windows-11-arm
-            run-hooks: false
+            install_env: false
+            run_hooks: false
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
@@ -76,22 +78,31 @@ jobs:
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           frozen: true
+          run-install: ${{ matrix.install_env }}
           cache: false
 
+      - name: Check lockfile
+        if: ${{ ! matrix.install_env }}
+        run: pixi lock --check --manifest-path pyproject.toml
+
       - name: Unit tests
+        if: matrix.install_env
         run: pixi run --frozen test
 
       - name: Lint
+        if: matrix.install_env
         run: pixi run --frozen lint
 
       - name: Format check
+        if: matrix.install_env
         run: pixi run --frozen format-check
 
       - name: Security audit
+        if: matrix.install_env
         run: pixi run --frozen audit-pypi
 
       - name: Prek hooks
-        if: matrix.run-hooks
+        if: matrix.run_hooks
         run: pixi run --frozen pre-commit-run-all
 
   dagger:

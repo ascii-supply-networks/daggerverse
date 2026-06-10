@@ -6,11 +6,13 @@ on:
     paths:
       - "**/pixi.lock"
       - "**/pyproject.toml"
+      - ".github/workflows/security-audit.yml"
       - "scripts/audit_pypi_from_pixi_lock.py"
   pull_request:
     paths:
       - "**/pixi.lock"
       - "**/pyproject.toml"
+      - ".github/workflows/security-audit.yml"
       - "scripts/audit_pypi_from_pixi_lock.py"
   schedule:
     - cron: "0 6 * * 1"
