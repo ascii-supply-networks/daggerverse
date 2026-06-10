@@ -1,12 +1,15 @@
 import pytest
 
 from pixi.utils import (
+    build_bash_entrypoint,
+    build_pixi_install_all_args,
     build_pixi_install_args,
     build_pixi_lock_check_args,
     build_pixi_run_args,
     build_pixi_shell_hook_args,
     image_ref,
     is_excluded,
+    normalize_environments,
     parse_environments,
     parse_requires_pixi,
     resolve_specifier,
@@ -90,6 +93,29 @@ def test_build_install_args() -> None:
     assert build_pixi_install_args("default") == ["pixi", "install", "--locked", "--environment", "default"]
 
 
+def test_build_install_args_rejects_empty_environment() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        build_pixi_install_args("")
+
+
+def test_build_install_all_args() -> None:
+    assert build_pixi_install_all_args() == ["pixi", "install", "--locked", "--all"]
+
+
+def test_normalize_environments() -> None:
+    assert normalize_environments(["default", "docs", "default"]) == ["default", "docs"]
+
+
+def test_normalize_environments_rejects_empty_list() -> None:
+    with pytest.raises(ValueError, match="At least one"):
+        normalize_environments([])
+
+
+def test_normalize_environments_rejects_empty_name() -> None:
+    with pytest.raises(ValueError, match="must not be empty"):
+        normalize_environments(["default", " "])
+
+
 def test_build_lock_check_args() -> None:
     assert build_pixi_lock_check_args() == ["pixi", "lock", "--check"]
 
@@ -120,3 +146,21 @@ def test_build_shell_hook_args() -> None:
         "default",
         "--json",
     ]
+
+
+def test_build_bash_shell_hook_args() -> None:
+    assert build_pixi_shell_hook_args("default", json=False, shell="bash") == [
+        "pixi",
+        "shell-hook",
+        "--locked",
+        "--environment",
+        "default",
+        "--shell",
+        "bash",
+    ]
+
+
+def test_build_bash_entrypoint() -> None:
+    assert build_bash_entrypoint("export PATH=/env/bin:$PATH\n") == (
+        '#!/usr/bin/env bash\nset -euo pipefail\nexport PATH=/env/bin:$PATH\nexec "$@"\n'
+    )

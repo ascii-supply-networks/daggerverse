@@ -5,7 +5,7 @@ Shared [Dagger](https://dagger.io) modules.
 Add as a dependency to another [Dagger](https://dagger.io) module:
 
 ```console
-$ dagger install github.com/ascii-supply-networks/daggerverse-pixi/pixi
+$ dagger install github.com/ascii-supply-networks/daggerverse/pixi
 ```
 
 This project is heavily inspired by the
@@ -17,4 +17,4 @@ colliding with the upstream project name.
 
 | Module | Description |
 |--------|-------------|
-| [`pixi`](./pixi) | Tooling for [Pixi](https://pixi.prefix.dev/latest/)-managed Python projects: discover workspaces, verify checked-in `pixi.lock` files, install environments in containers, run commands through Pixi, export shell hooks, and add [Dagger](https://dagger.io) SDK codegen overlays. |
+| [`pixi`](./pixi) | Tooling for [Pixi](https://pixi.prefix.dev/latest/)-managed Python projects: discover workspaces, verify checked-in `pixi.lock` files, install one or many environments, build minimal runtime containers, run commands through Pixi, and add [Dagger](https://dagger.io) SDK codegen overlays. |

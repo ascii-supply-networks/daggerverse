@@ -5,19 +5,25 @@ import dagger
 from dagger import Doc, dag, field, function, object_type
 from dagger.telemetry import get_tracer
 
-from pixi.args import EnvironmentName, PixiCommand
+from pixi.args import EnvironmentName, EnvironmentNames, PixiCommand
 from pixi.utils import (
     _DEFAULT_VERSION,
+    build_bash_entrypoint,
+    build_pixi_install_all_args,
     build_pixi_install_args,
     build_pixi_lock_check_args,
     build_pixi_run_args,
     build_pixi_shell_hook_args,
     image_ref,
+    normalize_environments,
     parse_environments,
     parse_requires_pixi,
     resolve_specifier,
 )
 from pixi.workspace._codegen import dagger_codegen as _run_codegen
+
+_DEFAULT_RUNTIME_IMAGE = "ubuntu:noble"
+_RUNTIME_ENTRYPOINT = "/usr/local/bin/pixi-entrypoint"
 
 
 @object_type
@@ -63,6 +69,32 @@ class PixiWorkspaceSource:
             return ws_dir
         return self.source.with_directory(self.path, ws_dir)
 
+    async def _install_base(
+        self,
+        *,
+        base_container: dagger.Container | None,
+        pixi_version: str | None,
+        image: str | None,
+        dagger_codegen: bool,
+    ) -> dagger.Container:
+        source = await self._source_with_codegen(dagger_codegen)
+        image_ref_value = await self._resolved_image(pixi_version, image)
+        ctr = base_container if base_container is not None else dag.container().from_(image_ref_value)
+        workdir = "/work" if self.path == "." else posixpath.join("/work", self.path)
+        return (
+            ctr.with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
+            .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
+            .with_directory("/work", source)
+            .with_workdir(workdir)
+            .with_env_variable("PIXI_NO_PROGRESS", "true")
+        )
+
+    def _workdir(self) -> str:
+        return "/work" if self.path == "." else posixpath.join("/work", self.path)
+
+    def _env_dir(self, environment: str) -> str:
+        return posixpath.join(self._workdir(), ".pixi", "envs", environment)
+
     @function
     async def pixi_version(self) -> str:
         """The Pixi version this workspace requires as a concrete image tag."""
@@ -100,23 +132,250 @@ class PixiWorkspaceSource:
         ] = True,
     ) -> dagger.Container:
         """Install a Pixi environment from the committed lock file."""
+        return await self.install_environments(
+            environments=[environment],
+            base_container=base_container,
+            pixi_version=pixi_version,
+            image=image,
+            dagger_codegen=dagger_codegen,
+        )
+
+    @function
+    async def install_environments(
+        self,
+        environments: EnvironmentNames,
+        base_container: Annotated[
+            dagger.Container | None,
+            Doc("Container to install into. Defaults to a Pixi image pinned to this workspace."),
+        ] = None,
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version image tag. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi image reference. Overrides `pixi_version`."),
+        ] = None,
+        dagger_codegen: Annotated[
+            bool,
+            Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
+        ] = True,
+    ) -> dagger.Container:
+        """Install selected Pixi environments into one container."""
+        names = normalize_environments(environments)
         with get_tracer().start_as_current_span("pixi install") as span:
             span.set_attribute("workspace.path", self.path)
-            span.set_attribute("pixi.environment", environment)
-            source = await self._source_with_codegen(dagger_codegen)
-            image_ref_value = await self._resolved_image(pixi_version, image)
-            ctr = base_container if base_container is not None else dag.container().from_(image_ref_value)
-            workdir = "/work" if self.path == "." else posixpath.join("/work", self.path)
-            ctr = (
-                ctr.with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
-                .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
-                .with_directory("/work", source)
-                .with_workdir(workdir)
-                .with_env_variable("PIXI_NO_PROGRESS", "true")
+            span.set_attribute("pixi.environments", ",".join(names))
+            ctr = await self._install_base(
+                base_container=base_container,
+                pixi_version=pixi_version,
+                image=image,
+                dagger_codegen=dagger_codegen,
             )
-            args = build_pixi_install_args(environment)
-            span.set_attribute("pixi.install_args", args)
+            for environment in names:
+                args = build_pixi_install_args(environment)
+                span.add_event(
+                    "pixi install environment", {"pixi.environment": environment, "pixi.install_args": " ".join(args)}
+                )
+                ctr = ctr.with_exec(args)
+            return await ctr.sync()
+
+    @function
+    async def install_all_environments(
+        self,
+        base_container: Annotated[
+            dagger.Container | None,
+            Doc("Container to install into. Defaults to a Pixi image pinned to this workspace."),
+        ] = None,
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version image tag. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi image reference. Overrides `pixi_version`."),
+        ] = None,
+        dagger_codegen: Annotated[
+            bool,
+            Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
+        ] = True,
+    ) -> dagger.Container:
+        """Install every Pixi environment declared by the lock file into one container."""
+        with get_tracer().start_as_current_span("pixi install all") as span:
+            span.set_attribute("workspace.path", self.path)
+            args = build_pixi_install_all_args()
+            span.set_attribute("pixi.install_args", " ".join(args))
+            ctr = await self._install_base(
+                base_container=base_container,
+                pixi_version=pixi_version,
+                image=image,
+                dagger_codegen=dagger_codegen,
+            )
             return await ctr.with_exec(args).sync()
+
+    @function
+    async def runtime(
+        self,
+        environment: EnvironmentName = "default",
+        runtime_base_container: Annotated[
+            dagger.Container | None,
+            Doc("Runtime base container. Defaults to `ubuntu:noble`."),
+        ] = None,
+        runtime_image: Annotated[
+            str,
+            Doc("Runtime image used when `runtime_base_container` is not set."),
+        ] = _DEFAULT_RUNTIME_IMAGE,
+        base_container: Annotated[
+            dagger.Container | None,
+            Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
+        ] = None,
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version image tag for the builder. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        dagger_codegen: Annotated[
+            bool,
+            Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
+        ] = True,
+    ) -> dagger.Container:
+        """Build a runtime container with one Pixi environment and no Pixi binary."""
+        return await self.runtime_environments(
+            environments=[environment],
+            entrypoint_environment=environment,
+            runtime_base_container=runtime_base_container,
+            runtime_image=runtime_image,
+            base_container=base_container,
+            pixi_version=pixi_version,
+            image=image,
+            dagger_codegen=dagger_codegen,
+        )
+
+    @function
+    async def runtime_environments(
+        self,
+        environments: EnvironmentNames,
+        entrypoint_environment: EnvironmentName = "default",
+        runtime_base_container: Annotated[
+            dagger.Container | None,
+            Doc("Runtime base container. Defaults to `ubuntu:noble`."),
+        ] = None,
+        runtime_image: Annotated[
+            str,
+            Doc("Runtime image used when `runtime_base_container` is not set."),
+        ] = _DEFAULT_RUNTIME_IMAGE,
+        base_container: Annotated[
+            dagger.Container | None,
+            Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
+        ] = None,
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version image tag for the builder. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        dagger_codegen: Annotated[
+            bool,
+            Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
+        ] = True,
+    ) -> dagger.Container:
+        """Build a runtime container with selected Pixi environments and no Pixi binary."""
+        names = normalize_environments([entrypoint_environment, *environments])
+        builder = await self.install_environments(
+            environments=names,
+            base_container=base_container,
+            pixi_version=pixi_version,
+            image=image,
+            dagger_codegen=dagger_codegen,
+        )
+        return await self._runtime_from_builder(
+            builder=builder,
+            environments=names,
+            entrypoint_environment=entrypoint_environment,
+            runtime_base_container=runtime_base_container,
+            runtime_image=runtime_image,
+            dagger_codegen=dagger_codegen,
+        )
+
+    @function
+    async def runtime_all_environments(
+        self,
+        entrypoint_environment: EnvironmentName = "default",
+        runtime_base_container: Annotated[
+            dagger.Container | None,
+            Doc("Runtime base container. Defaults to `ubuntu:noble`."),
+        ] = None,
+        runtime_image: Annotated[
+            str,
+            Doc("Runtime image used when `runtime_base_container` is not set."),
+        ] = _DEFAULT_RUNTIME_IMAGE,
+        base_container: Annotated[
+            dagger.Container | None,
+            Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
+        ] = None,
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version image tag for the builder. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        dagger_codegen: Annotated[
+            bool,
+            Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
+        ] = True,
+    ) -> dagger.Container:
+        """Build a runtime container with every Pixi environment and no Pixi binary."""
+        names = normalize_environments(await self.environments())
+        if entrypoint_environment not in names:
+            msg = f"Entrypoint environment {entrypoint_environment!r} is not declared by workspace {self.path!r}."
+            raise ValueError(msg)
+        builder = await self.install_all_environments(
+            base_container=base_container,
+            pixi_version=pixi_version,
+            image=image,
+            dagger_codegen=dagger_codegen,
+        )
+        return await self._runtime_from_builder(
+            builder=builder,
+            environments=names,
+            entrypoint_environment=entrypoint_environment,
+            runtime_base_container=runtime_base_container,
+            runtime_image=runtime_image,
+            dagger_codegen=dagger_codegen,
+        )
+
+    async def _runtime_from_builder(
+        self,
+        *,
+        builder: dagger.Container,
+        environments: list[str],
+        entrypoint_environment: str,
+        runtime_base_container: dagger.Container | None,
+        runtime_image: str,
+        dagger_codegen: bool,
+    ) -> dagger.Container:
+        source = await self._source_with_codegen(dagger_codegen)
+        workdir = self._workdir()
+        shell_hook = await builder.with_exec(
+            build_pixi_shell_hook_args(entrypoint_environment, json=False, shell="bash")
+        ).stdout()
+        runtime = runtime_base_container if runtime_base_container is not None else dag.container().from_(runtime_image)
+        runtime = (
+            runtime.with_directory("/work", source)
+            .with_workdir(workdir)
+            .with_new_file(_RUNTIME_ENTRYPOINT, build_bash_entrypoint(shell_hook), permissions=0o755)
+            .with_entrypoint([_RUNTIME_ENTRYPOINT])
+        )
+        for environment in environments:
+            runtime = runtime.with_directory(self._env_dir(environment), builder.directory(self._env_dir(environment)))
+        return await runtime.sync()
 
     @function
     async def locked(

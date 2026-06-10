@@ -12,14 +12,19 @@ _SOURCE_IGNORE = [
     "**/.pytest_cache",
     "**/.ruff_cache",
     "**/.mypy_cache",
+    "**/.cache",
     "**/.direnv",
     "**/.devenv",
     "**/node_modules",
     "**/dist",
     "**/build",
+    "**/site",
     "**/*.egg-info",
     "**/sdk",
 ]
+
+_LANDING_PROJECT = ".docs"
+_ZENSICAL_GLOB = "*/zensical.toml"
 
 
 def _base() -> dagger.Container:
@@ -58,16 +63,40 @@ class AsciiDaggerverse:
 
     @function
     async def docs_build(self) -> dagger.Directory:
-        """Build the static docs site."""
+        """Build the combined static docs site."""
         ctr = (
             _base()
             .with_directory("/workspace", self.source)
             .with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
             .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
             .with_env_variable("PIXI_NO_PROGRESS", "true")
-            .with_exec(["pixi", "run", "--frozen", "python", "-m", "zensical", "build", "-f", "pixi/zensical.toml"])
         )
-        return ctr.directory("/workspace/pixi/site")
+        combined = await self._zensical_site(ctr, _LANDING_PROJECT)
+        modules = sorted(
+            module
+            for module in (path.rsplit("/", 1)[0] for path in await self.source.glob(_ZENSICAL_GLOB))
+            if not module.startswith(".")
+        )
+        for module in modules:
+            combined = combined.with_directory(module, await self._zensical_site(ctr, module))
+        return combined
+
+    async def _zensical_site(self, ctr: dagger.Container, project: str) -> dagger.Directory:
+        """Build one Zensical site and return its generated site directory."""
+        return ctr.with_exec(
+            [
+                "pixi",
+                "run",
+                "--frozen",
+                "python",
+                "-m",
+                "zensical",
+                "build",
+                "-f",
+                f"{project}/zensical.toml",
+                "--clean",
+            ]
+        ).directory(f"/workspace/{project}/site")
 
     @check
     @function

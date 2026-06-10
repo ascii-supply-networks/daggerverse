@@ -1,0 +1,38 @@
+[project]
+site_name = "ASCII Daggerverse"
+site_description = "Shared Dagger modules published from the ASCII daggerverse."
+site_author = "ASCII Supply Networks"
+repo_url = "https://github.com/ascii-supply-networks/daggerverse"
+repo_name = "ascii-supply-networks/daggerverse"
+edit_uri = "edit/main/.docs/docs/"
+copyright = "Copyright &copy; 2026 ASCII Supply Networks"
+
+nav = [
+  { "Home" = "index.md" },
+]
+
+[project.theme]
+features = [
+  "content.action.edit",
+  "navigation.footer",
+  "navigation.top",
+]
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+[project.markdown_extensions.toc]
+permalink = true

@@ -1,8 +1,10 @@
 [project]
-site_name = "pixi"
-site_description = "Dagger module for Pixi-managed workspaces."
+site_name = "pixi - Dagger module"
+site_description = "A Dagger module for Pixi-managed Python projects and workspaces."
 site_author = "ascii-supply-networks"
-repo_url = "https://github.com/ascii-supply-networks/daggerverse-pixi"
+repo_url = "https://github.com/ascii-supply-networks/daggerverse"
+repo_name = "ascii-supply-networks/daggerverse"
+edit_uri = "edit/main/pixi/docs/"
 docs_dir = "docs"
 site_dir = "site"
 copyright = "Copyright &copy; 2026 ascii-supply-networks"
@@ -17,9 +19,24 @@ nav = [
 language = "en"
 features = [
   "content.code.copy",
+  "content.code.annotate",
+  "content.tabs.link",
   "navigation.footer",
-  "navigation.path",
   "navigation.sections",
   "navigation.top",
-  "search.highlight",
 ]
+
+[[project.theme.palette]]
+scheme = "slate"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+scheme = "default"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[[project.extra.social]]
+icon = "lucide/blocks"
+link = "https://daggerverse.dev/mod/github.com/ascii-supply-networks/daggerverse/pixi"
+name = "Daggerverse (SDK reference)"

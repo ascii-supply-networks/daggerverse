@@ -94,9 +94,33 @@ def parse_environments(content: str, manifest_name: str) -> list[str]:
     return sorted(names)
 
 
+def normalize_environments(environments: list[str]) -> list[str]:
+    """Return unique environment names in input order."""
+    names: list[str] = []
+    for environment in environments:
+        name = environment.strip()
+        if not name:
+            msg = "Pixi environment names must not be empty."
+            raise ValueError(msg)
+        if name not in names:
+            names.append(name)
+    if not names:
+        msg = "At least one Pixi environment is required."
+        raise ValueError(msg)
+    return names
+
+
 def build_pixi_install_args(environment: str) -> list[str]:
     """Build the `pixi install` argv used by the module."""
+    if not environment.strip():
+        msg = "Pixi environment name must not be empty."
+        raise ValueError(msg)
     return ["pixi", "install", "--locked", "--environment", environment]
+
+
+def build_pixi_install_all_args() -> list[str]:
+    """Build the `pixi install --all` argv used by the module."""
+    return ["pixi", "install", "--locked", "--all"]
 
 
 def build_pixi_lock_check_args() -> list[str]:
@@ -112,9 +136,16 @@ def build_pixi_run_args(command: list[str], environment: str) -> list[str]:
     return ["pixi", "run", "--locked", "--environment", environment, *command]
 
 
-def build_pixi_shell_hook_args(environment: str, *, json: bool = True) -> list[str]:
+def build_pixi_shell_hook_args(environment: str, *, json: bool = True, shell: str | None = None) -> list[str]:
     """Build the `pixi shell-hook` argv used by the module."""
     args = ["pixi", "shell-hook", "--locked", "--environment", environment]
+    if shell is not None:
+        args.extend(["--shell", shell])
     if json:
         args.append("--json")
     return args
+
+
+def build_bash_entrypoint(shell_hook: str) -> str:
+    """Build a Bash entrypoint that activates a Pixi environment without Pixi."""
+    return f'#!/usr/bin/env bash\nset -euo pipefail\n{shell_hook.rstrip()}\nexec "$@"\n'

@@ -17,11 +17,14 @@ SourceDir = Annotated[
             "**/.pytest_cache",
             "**/.ruff_cache",
             "**/.mypy_cache",
+            "**/.cache",
             "**/.direnv",
             "**/.devenv",
             "**/node_modules",
             "**/dist",
             "**/build",
+            "**/site",
+            "**/public",
             "**/*.egg-info",
             "**/sdk",
         ]
@@ -36,6 +39,11 @@ WorkspacePath: TypeAlias = Annotated[
 EnvironmentName: TypeAlias = Annotated[
     str,
     Doc("Pixi environment name. Defaults to the implicit `default` environment."),
+]
+
+EnvironmentNames: TypeAlias = Annotated[
+    list[str],
+    Doc("Pixi environment names to install into the same container."),
 ]
 
 PixiCommand: TypeAlias = Annotated[

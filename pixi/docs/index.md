@@ -12,7 +12,7 @@ workspaces.
 !!! note "API reference"
 
     This site is a tutorial. The generated SDK reference is published on the
-    [Daggerverse](https://daggerverse.dev/mod/github.com/ascii-supply-networks/daggerverse-pixi/pixi).
+    [Daggerverse](https://daggerverse.dev/mod/github.com/ascii-supply-networks/daggerverse/pixi).
 
 !!! note "Upstream inspiration"
 
@@ -28,13 +28,15 @@ metadata, and runs `pixi install` / `pixi run` in containers.
 ## Installation
 
 ```console
-dagger install github.com/ascii-supply-networks/daggerverse-pixi/pixi
+dagger install github.com/ascii-supply-networks/daggerverse/pixi
 ```
 
 ## Quickstart
 
 ```console
 dagger call pixi workspace install --environment default
+dagger call pixi workspace install-environments --environments default --environments docs
+dagger call pixi workspace runtime --environment default
 dagger call pixi workspace run --args python --args --version
 dagger check pixi:locked
 ```
@@ -44,7 +46,9 @@ dagger check pixi:locked
 - `Pixi` holds the source tree and discovers workspaces.
 - `PixiWorkspaceSource` represents one workspace rooted at a `pixi.lock`.
 - `locked` checks that committed locks are up to date.
-- `install` creates a container with one named Pixi environment installed.
+- `install` creates a Pixi-based container with one named environment installed.
+- `install_environments` installs selected environments into the same Pixi-based container.
+- `runtime` and `runtime_environments` copy installed Pixi environments into a runtime image without the Pixi binary.
 - `run` executes a command through Pixi in a named environment.
 
 ## Where to go next
