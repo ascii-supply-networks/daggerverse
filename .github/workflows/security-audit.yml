@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 env:
-  PIXI_VERSION: "0.70.2"
+  PIXI_VERSION: "latest"
 
 jobs:
   python-pypi:

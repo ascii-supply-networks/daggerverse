@@ -6,7 +6,7 @@ on:
 
 env:
   DAGGER_VERSION: "0.21.4"
-  PIXI_VERSION: "0.70.2"
+  PIXI_VERSION: "latest"
 
 jobs:
   publish:

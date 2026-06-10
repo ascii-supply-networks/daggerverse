@@ -12,7 +12,7 @@ concurrency:
 
 env:
   DAGGER_VERSION: "0.21.4"
-  PIXI_VERSION: "0.70.2"
+  PIXI_VERSION: "latest"
 
 jobs:
   python:
@@ -39,6 +39,15 @@ jobs:
 
       - name: Format check
         run: pixi run --frozen format-check
+
+      - name: Security audit
+        run: pixi run --frozen audit-pypi
+
+      - name: Pin GitHub Actions
+        run: pixi run --frozen pin-actions
+
+      - name: Audit GitHub Actions
+        run: pixi run --frozen audit-github-actions
 
       - name: Prek hooks
         run: pixi run --frozen pre-commit-run-all
