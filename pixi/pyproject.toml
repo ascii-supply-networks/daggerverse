@@ -3,6 +3,7 @@ name = "pixi"
 version = "0.1.0"
 description = "Dagger module for Pixi workspaces"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
     "dagger-io",

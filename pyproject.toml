@@ -3,6 +3,7 @@ name = "ascii-daggerverse"
 version = "0.1.0"
 description = "ASCII Daggerverse modules"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = []
 
