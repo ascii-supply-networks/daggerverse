@@ -1,0 +1,41 @@
+name: Upstream Watch
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: upstream-watch
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  PIXI_VERSION: "0.70.2"
+
+jobs:
+  upstream-watch:
+    name: upstream watch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          frozen: true
+          cache: false
+
+      - name: Check upstream daggerverse updates
+        run: |
+          pixi run --frozen python scripts/check_upstream_updates.py \
+            --config .github/upstream-watch.json \
+            --output upstream-watch.md \
+            --update-issue
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

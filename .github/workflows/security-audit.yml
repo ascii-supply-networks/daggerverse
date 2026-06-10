@@ -1,0 +1,45 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/pixi.lock"
+      - "**/pyproject.toml"
+      - "scripts/audit_pypi_from_pixi_lock.py"
+  pull_request:
+    paths:
+      - "**/pixi.lock"
+      - "**/pyproject.toml"
+      - "scripts/audit_pypi_from_pixi_lock.py"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PIXI_VERSION: "0.70.2"
+
+jobs:
+  python-pypi:
+    name: Python PyPI (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          frozen: true
+          cache: false
+
+      - name: Audit PyPI packages
+        run: pixi run --frozen audit-pypi

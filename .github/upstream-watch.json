@@ -1,0 +1,62 @@
+{
+  "upstream": {
+    "repository": "typesafe-ai/daggerverse",
+    "branch": "main",
+    "base_commit": "7d07d8e68eb0678f2b022689cc191b82a5505053",
+    "base_note": "ci: fix daggerverse publish (#69), ported to this repo"
+  },
+  "tracking_issue": {
+    "title": "Review upstream typesafe-ai/daggerverse updates",
+    "labels": ["upstream-sync"],
+    "label_color": "5319e7"
+  },
+  "relevance": {
+    "path_rules": [
+      {
+        "pattern": "uv/**",
+        "reason": "Pixi follows the upstream uv module architecture"
+      },
+      {
+        "pattern": ".github/workflows/**",
+        "reason": "workflow, publish, docs, or security behavior may need porting"
+      },
+      {
+        "pattern": "README.md",
+        "reason": "root docs style is intentionally aligned with upstream"
+      },
+      {
+        "pattern": "docs/**",
+        "reason": "documentation conventions may need porting"
+      },
+      {
+        "pattern": "pyproject.toml",
+        "reason": "repo tooling and dependency changes may need porting"
+      },
+      {
+        "pattern": "prek.toml",
+        "reason": "hook policy may need porting"
+      },
+      {
+        "pattern": "ruff.toml",
+        "reason": "lint policy may need porting"
+      },
+      {
+        "pattern": "*dagger.json",
+        "reason": "Dagger module metadata may need porting"
+      }
+    ],
+    "message_keywords": [
+      "ci",
+      "daggerverse",
+      "docs",
+      "pinact",
+      "publish",
+      "ruff",
+      "security",
+      "uv",
+      "workflow",
+      "zizmor"
+    ]
+  },
+  "max_pages": 3
+}

@@ -1,0 +1,21 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# Keep this as a root config file: prek 0.4 validates `prek.toml` or
+# `.pre-commit-config.yaml`, not `[tool.prek]` inside `pyproject.toml`.
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "check-added-large-files" },
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "ruff-check", name = "Ruff check", entry = "ruff check --fix", language = "system", types_or = ["python", "pyi"] },
+    { id = "ruff-format", name = "Ruff format", entry = "ruff format", language = "system", types_or = ["python", "pyi"] },
+    { id = "pinact", name = "Pin GitHub Actions", entry = "pinact run --fix=false --no-api", language = "system", pass_filenames = false, files = "^\\.github/" },
+    { id = "zizmor", name = "Audit GitHub Actions", entry = "zizmor --offline .github", language = "system", pass_filenames = false, files = "^\\.github/" },
+]

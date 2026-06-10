@@ -1,0 +1,23 @@
+{
+  "name": "ascii-daggerverse",
+  "engineVersion": "v0.21.4",
+  "sdk": {
+    "source": "python"
+  },
+  "toolchains": [
+    {
+      "name": "pixi",
+      "source": "pixi",
+      "customizations": [
+        {
+          "function": [
+            "locked"
+          ],
+          "argument": "exclude",
+          "default": "[\"**/tests/_packages/**\"]"
+        }
+      ]
+    }
+  ],
+  "source": ".dagger"
+}

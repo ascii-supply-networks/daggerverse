@@ -1,0 +1,33 @@
+[project]
+name = "pixi"
+version = "0.1.0"
+description = "Dagger module for Pixi workspaces"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dagger-io",
+    "packaging>=26.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "linux-aarch64", "osx-arm64", "win-64", "win-arm64"]
+requires-pixi = ">=0.70.0"
+
+[tool.pixi.dependencies]
+python = ">=3.13,<3.15"
+pytest = ">=9.0.3,<10"
+
+[tool.pixi.pypi-dependencies]
+pixi = { path = ".", editable = true }
+dagger-io = ">=0.21.4"
+packaging = ">=26.2"
+ruff = ">=0.14.8,<0.15"
+
+[tool.pixi.tasks]
+test = "python -m pytest -q"
+lint = "ruff check ."

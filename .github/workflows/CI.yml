@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DAGGER_VERSION: "0.21.4"
+  PIXI_VERSION: "0.70.2"
+
+jobs:
+  python:
+    name: python
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          frozen: true
+          cache: false
+
+      - name: Unit tests
+        run: pixi run --frozen test
+
+      - name: Lint
+        run: pixi run --frozen lint
+
+      - name: Format check
+        run: pixi run --frozen format-check
+
+      - name: Prek hooks
+        run: pixi run --frozen pre-commit-run-all
+
+  windows:
+    name: windows (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: x64
+            runner: windows-latest
+            run-hooks: true
+          - name: arm64
+            runner: windows-11-arm
+            run-hooks: false
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          frozen: true
+          cache: false
+
+      - name: Unit tests
+        run: pixi run --frozen test
+
+      - name: Lint
+        run: pixi run --frozen lint
+
+      - name: Format check
+        run: pixi run --frozen format-check
+
+      - name: Security audit
+        run: pixi run --frozen audit-pypi
+
+      - name: Prek hooks
+        if: matrix.run-hooks
+        run: pixi run --frozen pre-commit-run-all
+
+  dagger:
+    name: dagger
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        with:
+          pixi-version: ${{ env.PIXI_VERSION }}
+          frozen: true
+          cache: false
+
+      - name: Run Dagger checks
+        run: pixi run --frozen dagger-check
