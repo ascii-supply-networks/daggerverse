@@ -11,13 +11,13 @@ copyright = "Copyright &copy; 2026 ascii-supply-networks"
 nav = [
   { "Overview" = "index.md" },
   { "Building containers" = "building.md" },
-  { "GitHub Actions" = "github-actions.md" },
-  { "Lock checks" = "checks/locked.md" },
+  { "Environments and features" = "environments.md" },
 ]
 
 [project.theme]
 language = "en"
 features = [
+  "content.action.edit",
   "content.code.copy",
   "content.code.annotate",
   "content.tabs.link",
@@ -40,3 +40,22 @@ toggle.name = "Switch to dark mode"
 icon = "lucide/blocks"
 link = "https://daggerverse.dev/mod/github.com/ascii-supply-networks/daggerverse/pixi"
 name = "Daggerverse (SDK reference)"
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.emoji]
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+[project.markdown_extensions.toc]
+permalink = true

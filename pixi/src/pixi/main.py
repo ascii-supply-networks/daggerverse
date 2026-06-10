@@ -13,13 +13,24 @@ from pixi.workspace.workspace import DEFAULT_RUNTIME_IMAGE, PixiWorkspaceSource
 
 @object_type
 class Pixi:
-    """Entrypoint for the `pixi` module."""
+    """Entrypoint for the `pixi` module.
+
+    Root functions operate on the workspace at `.` by default and accept `path`
+    for nested Pixi workspaces. Use `workspace` when you want to keep a
+    `PixiWorkspaceSource` object around explicitly.
+
+    Learn more in the module docs and generated SDK reference.
+    """
 
     source: SourceDir = field()
 
     @function
     def workspace(self, path: WorkspacePath = ".") -> PixiWorkspaceSource:
-        """A single Pixi workspace at `path` within the source tree."""
+        """A single Pixi workspace at `path` within the source tree.
+
+        The returned workspace can install environments, run commands, and build
+        runtime images without the Pixi binary.
+        """
         return PixiWorkspaceSource(source=self.source, path=path)
 
     @function
