@@ -75,11 +75,53 @@ jobs:
           persist-credentials: false
 
       - uses: prefix-dev/setup-pixi@5185adfbffb4bd703da3010310260805d89ebb11 # v0.9.6
+        if: matrix.install_env
         with:
           pixi-version: ${{ env.PIXI_VERSION }}
           frozen: true
           run-install: ${{ matrix.install_env }}
           cache: false
+
+      - name: Install Pixi
+        if: ${{ ! matrix.install_env }}
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+          if ($env:PIXI_VERSION -eq "latest") {
+            $releaseUrl = "https://api.github.com/repos/prefix-dev/pixi/releases/latest"
+          } else {
+            $releaseUrl = "https://api.github.com/repos/prefix-dev/pixi/releases/tags/$env:PIXI_VERSION"
+          }
+          $release = Invoke-RestMethod -Uri $releaseUrl -Headers $headers
+          $assetName = "pixi-aarch64-pc-windows-msvc.zip"
+          $asset = $release.assets | Where-Object { $_.name -eq $assetName } | Select-Object -First 1
+          $shaAsset = $release.assets | Where-Object { $_.name -eq "$assetName.sha256" } | Select-Object -First 1
+          if ($null -eq $asset -or $null -eq $shaAsset) {
+            throw "Pixi release $($release.tag_name) is missing $assetName or its checksum"
+          }
+          $zipPath = Join-Path $env:RUNNER_TEMP $assetName
+          $shaPath = "$zipPath.sha256"
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
+          Invoke-WebRequest -Uri $shaAsset.browser_download_url -OutFile $shaPath
+          $expected = (Get-Content $shaPath -Raw).Split(" ", [System.StringSplitOptions]::RemoveEmptyEntries)[0].Trim().ToLowerInvariant()
+          $actual = (Get-FileHash -Algorithm SHA256 $zipPath).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Pixi checksum mismatch for $assetName"
+          }
+          $binDir = Join-Path $env:USERPROFILE ".pixi\bin"
+          New-Item -ItemType Directory -Path $binDir -Force | Out-Null
+          Expand-Archive -Path $zipPath -DestinationPath $binDir -Force
+          $binDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Pixi info
+        if: ${{ ! matrix.install_env }}
+        run: pixi info --manifest-path pyproject.toml
 
       - name: Check lockfile
         if: ${{ ! matrix.install_env }}
