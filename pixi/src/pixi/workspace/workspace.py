@@ -5,7 +5,7 @@ import dagger
 from dagger import Doc, dag, field, function, object_type
 from dagger.telemetry import get_tracer
 
-from pixi.args import EnvironmentName, EnvironmentNames, PixiCommand
+from pixi.args import EnvironmentName, EnvironmentNames, PixiCommand, RuntimeSourcePaths
 from pixi.utils import (
     _DEFAULT_VERSION,
     build_bash_entrypoint,
@@ -16,13 +16,14 @@ from pixi.utils import (
     build_pixi_shell_hook_args,
     image_ref,
     normalize_environments,
+    normalize_runtime_source_paths,
     parse_environments,
     parse_requires_pixi,
     resolve_specifier,
 )
 from pixi.workspace._codegen import dagger_codegen as _run_codegen
 
-_DEFAULT_RUNTIME_IMAGE = "ubuntu:noble"
+DEFAULT_RUNTIME_IMAGE = "ubuntu:noble"
 _RUNTIME_ENTRYPOINT = "/usr/local/bin/pixi-entrypoint"
 
 
@@ -224,7 +225,7 @@ class PixiWorkspaceSource:
         runtime_image: Annotated[
             str,
             Doc("Runtime image used when `runtime_base_container` is not set."),
-        ] = _DEFAULT_RUNTIME_IMAGE,
+        ] = DEFAULT_RUNTIME_IMAGE,
         base_container: Annotated[
             dagger.Container | None,
             Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
@@ -236,6 +237,10 @@ class PixiWorkspaceSource:
         image: Annotated[
             str | None,
             Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        runtime_source_paths: Annotated[
+            RuntimeSourcePaths | None,
+            Doc("Relative source paths or glob patterns to copy into the runtime image. Defaults to the full source."),
         ] = None,
         dagger_codegen: Annotated[
             bool,
@@ -251,6 +256,7 @@ class PixiWorkspaceSource:
             base_container=base_container,
             pixi_version=pixi_version,
             image=image,
+            runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
         )
 
@@ -266,7 +272,7 @@ class PixiWorkspaceSource:
         runtime_image: Annotated[
             str,
             Doc("Runtime image used when `runtime_base_container` is not set."),
-        ] = _DEFAULT_RUNTIME_IMAGE,
+        ] = DEFAULT_RUNTIME_IMAGE,
         base_container: Annotated[
             dagger.Container | None,
             Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
@@ -278,6 +284,10 @@ class PixiWorkspaceSource:
         image: Annotated[
             str | None,
             Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        runtime_source_paths: Annotated[
+            RuntimeSourcePaths | None,
+            Doc("Relative source paths or glob patterns to copy into the runtime image. Defaults to the full source."),
         ] = None,
         dagger_codegen: Annotated[
             bool,
@@ -299,6 +309,7 @@ class PixiWorkspaceSource:
             entrypoint_environment=entrypoint_environment,
             runtime_base_container=runtime_base_container,
             runtime_image=runtime_image,
+            runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
         )
 
@@ -313,7 +324,7 @@ class PixiWorkspaceSource:
         runtime_image: Annotated[
             str,
             Doc("Runtime image used when `runtime_base_container` is not set."),
-        ] = _DEFAULT_RUNTIME_IMAGE,
+        ] = DEFAULT_RUNTIME_IMAGE,
         base_container: Annotated[
             dagger.Container | None,
             Doc("Builder container to install with Pixi. Defaults to a Pixi image pinned to this workspace."),
@@ -325,6 +336,10 @@ class PixiWorkspaceSource:
         image: Annotated[
             str | None,
             Doc("Full Pixi builder image reference. Overrides `pixi_version`."),
+        ] = None,
+        runtime_source_paths: Annotated[
+            RuntimeSourcePaths | None,
+            Doc("Relative source paths or glob patterns to copy into the runtime image. Defaults to the full source."),
         ] = None,
         dagger_codegen: Annotated[
             bool,
@@ -348,6 +363,7 @@ class PixiWorkspaceSource:
             entrypoint_environment=entrypoint_environment,
             runtime_base_container=runtime_base_container,
             runtime_image=runtime_image,
+            runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
         )
 
@@ -359,17 +375,22 @@ class PixiWorkspaceSource:
         entrypoint_environment: str,
         runtime_base_container: dagger.Container | None,
         runtime_image: str,
+        runtime_source_paths: list[str] | None,
         dagger_codegen: bool,
     ) -> dagger.Container:
         source = await self._source_with_codegen(dagger_codegen)
         workdir = self._workdir()
+        source_paths = normalize_runtime_source_paths(runtime_source_paths)
         shell_hook = await builder.with_exec(
             build_pixi_shell_hook_args(entrypoint_environment, json=False, shell="bash")
         ).stdout()
         runtime = runtime_base_container if runtime_base_container is not None else dag.container().from_(runtime_image)
+        if source_paths == []:
+            runtime = runtime.with_directory("/work", dag.directory())
+        else:
+            runtime = runtime.with_directory("/work", source, include=source_paths)
         runtime = (
-            runtime.with_directory("/work", source)
-            .with_workdir(workdir)
+            runtime.with_workdir(workdir)
             .with_new_file(_RUNTIME_ENTRYPOINT, build_bash_entrypoint(shell_hook), permissions=0o755)
             .with_entrypoint([_RUNTIME_ENTRYPOINT])
         )

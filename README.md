@@ -17,4 +17,4 @@ colliding with the upstream project name.
 
 | Module | Description |
 |--------|-------------|
-| [`pixi`](./pixi) | Tooling for [Pixi](https://pixi.prefix.dev/latest/)-managed Python projects: discover workspaces, verify checked-in `pixi.lock` files, install one or many environments, build minimal runtime containers, run commands through Pixi, and add [Dagger](https://dagger.io) SDK codegen overlays. |
+| [`pixi`](./pixi) | Tooling for [Pixi](https://pixi.prefix.dev/latest/)-managed Python projects: verify checked-in `pixi.lock` files, install one or many environments in the same [Dagger](https://dagger.io) container, build filtered runtime images without Pixi, and run commands through Pixi. |

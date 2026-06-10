@@ -34,22 +34,28 @@ dagger install github.com/ascii-supply-networks/daggerverse/pixi
 ## Quickstart
 
 ```console
-dagger call pixi workspace install --environment default
-dagger call pixi workspace install-environments --environments default --environments docs
-dagger call pixi workspace runtime --environment default
-dagger call pixi workspace run --args python --args --version
+dagger call pixi install --environment default
+dagger call pixi install-environments --environments default --environments docs
+dagger call pixi runtime-environments --environments default --environments docs
+dagger call pixi run --args python --args --version
 dagger check pixi:locked
 ```
 
+Pass `--path` only when the source tree contains more than one Pixi workspace.
+
 ## API Shape
 
-- `Pixi` holds the source tree and discovers workspaces.
-- `PixiWorkspaceSource` represents one workspace rooted at a `pixi.lock`.
+- `Pixi` holds the source tree and exposes the default workspace at `.`.
+- `PixiWorkspaceSource` represents a nested workspace rooted at a `pixi.lock`.
 - `locked` checks that committed locks are up to date.
 - `install` creates a Pixi-based container with one named environment installed.
 - `install_environments` installs selected environments into the same Pixi-based container.
 - `runtime` and `runtime_environments` copy installed Pixi environments into a runtime image without the Pixi binary.
+- `runtime_source_paths` limits runtime images to the source paths a target needs.
 - `run` executes a command through Pixi in a named environment.
+
+Pixi features are not installed directly. Define environments from features in
+`pyproject.toml` or `pixi.toml`, then pass those environment names to the module.
 
 ## Where to go next
 

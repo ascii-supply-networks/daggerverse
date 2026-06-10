@@ -46,6 +46,11 @@ EnvironmentNames: TypeAlias = Annotated[
     Doc("Pixi environment names to install into the same container."),
 ]
 
+RuntimeSourcePaths: TypeAlias = Annotated[
+    list[str],
+    Doc("Relative source paths or glob patterns to copy into the runtime image."),
+]
+
 PixiCommand: TypeAlias = Annotated[
     list[str],
     Doc("Command argv passed to `pixi run`."),

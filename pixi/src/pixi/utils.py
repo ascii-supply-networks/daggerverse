@@ -110,6 +110,33 @@ def normalize_environments(environments: list[str]) -> list[str]:
     return names
 
 
+def normalize_runtime_source_paths(paths: list[str] | None) -> list[str] | None:
+    """Return runtime source include paths in input order."""
+    if paths is None:
+        return None
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        value = path.strip()
+        if not value:
+            msg = "Runtime source paths must not be empty."
+            raise ValueError(msg)
+        value = value.removeprefix("./")
+        if value == ".":
+            return None
+        if value.startswith("/"):
+            msg = f"Runtime source path {path!r} must be relative to the source root."
+            raise ValueError(msg)
+        if ".." in PurePosixPath(value).parts:
+            msg = f"Runtime source path {path!r} must not contain '..'."
+            raise ValueError(msg)
+        if value not in seen:
+            normalized.append(value)
+            seen.add(value)
+    return normalized
+
+
 def build_pixi_install_args(environment: str) -> list[str]:
     """Build the `pixi install` argv used by the module."""
     if not environment.strip():

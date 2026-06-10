@@ -10,6 +10,7 @@ from pixi.utils import (
     image_ref,
     is_excluded,
     normalize_environments,
+    normalize_runtime_source_paths,
     parse_environments,
     parse_requires_pixi,
     resolve_specifier,
@@ -114,6 +115,21 @@ def test_normalize_environments_rejects_empty_list() -> None:
 def test_normalize_environments_rejects_empty_name() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         normalize_environments(["default", " "])
+
+
+def test_normalize_runtime_source_paths() -> None:
+    assert normalize_runtime_source_paths(["./pyproject.toml", "src", "src"]) == ["pyproject.toml", "src"]
+
+
+def test_normalize_runtime_source_paths_defaults_to_full_source() -> None:
+    assert normalize_runtime_source_paths(None) is None
+    assert normalize_runtime_source_paths(["."]) is None
+
+
+@pytest.mark.parametrize("path", ["", " ", "/src", "../src", "src/../secret"])
+def test_normalize_runtime_source_paths_rejects_unsafe_paths(path: str) -> None:
+    with pytest.raises(ValueError):
+        normalize_runtime_source_paths([path])
 
 
 def test_build_lock_check_args() -> None:

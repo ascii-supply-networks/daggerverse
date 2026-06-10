@@ -10,7 +10,7 @@
 
     ---
 
-    Build containers, install one or many [Pixi](https://pixi.prefix.dev/latest/) environments, and run lock checks for Pixi-managed Python workspaces.
+    Install one or many [Pixi](https://pixi.prefix.dev/latest/) environments in a [Dagger](https://dagger.io) container and build filtered runtime images without Pixi.
 
     ---
 
