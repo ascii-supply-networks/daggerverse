@@ -65,6 +65,27 @@ Use `run` for a one-off command in that environment:
     ctr = await dag.pixi(source=src).run(args=["python", "--version"])
     ```
 
+## Lockfile mode
+
+Install, run, and runtime image methods default to Pixi's `--locked` mode for
+compatibility. Use `lockfile_mode="frozen"` for CI/container builds that must
+fail when `pixi.lock` is stale.
+
+=== "CLI"
+
+    ```console
+    $ dagger call pixi install --environment default --lockfile-mode frozen
+    ```
+
+=== "Python SDK"
+
+    ```python
+    ctr = await dag.pixi(source=src).install(
+        environment="default",
+        lockfile_mode="frozen",
+    )
+    ```
+
 ## Multiple environments
 
 `install_environments` installs several Pixi environments into the same builder

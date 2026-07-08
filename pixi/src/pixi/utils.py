@@ -137,17 +137,26 @@ def normalize_runtime_source_paths(paths: list[str] | None) -> list[str] | None:
     return normalized
 
 
-def build_pixi_install_args(environment: str) -> list[str]:
+def lockfile_mode_arg(mode: str) -> str:
+    """Return the Pixi CLI flag for a supported lockfile mode."""
+    normalized = mode.strip().lower()
+    if normalized not in {"locked", "frozen"}:
+        msg = "Pixi lockfile mode must be 'locked' or 'frozen'."
+        raise ValueError(msg)
+    return f"--{normalized}"
+
+
+def build_pixi_install_args(environment: str, lockfile_mode: str = "locked") -> list[str]:
     """Build the `pixi install` argv used by the module."""
     if not environment.strip():
         msg = "Pixi environment name must not be empty."
         raise ValueError(msg)
-    return ["pixi", "install", "--locked", "--environment", environment]
+    return ["pixi", "install", lockfile_mode_arg(lockfile_mode), "--environment", environment]
 
 
-def build_pixi_install_all_args() -> list[str]:
+def build_pixi_install_all_args(lockfile_mode: str = "locked") -> list[str]:
     """Build the `pixi install --all` argv used by the module."""
-    return ["pixi", "install", "--locked", "--all"]
+    return ["pixi", "install", lockfile_mode_arg(lockfile_mode), "--all"]
 
 
 def build_pixi_lock_check_args() -> list[str]:
@@ -155,17 +164,23 @@ def build_pixi_lock_check_args() -> list[str]:
     return ["pixi", "lock", "--check"]
 
 
-def build_pixi_run_args(command: list[str], environment: str) -> list[str]:
+def build_pixi_run_args(command: list[str], environment: str, lockfile_mode: str = "locked") -> list[str]:
     """Build the `pixi run` argv used by the module."""
     if not command:
         msg = "Pixi run requires at least one command argument."
         raise ValueError(msg)
-    return ["pixi", "run", "--locked", "--environment", environment, *command]
+    return ["pixi", "run", lockfile_mode_arg(lockfile_mode), "--environment", environment, *command]
 
 
-def build_pixi_shell_hook_args(environment: str, *, json: bool = True, shell: str | None = None) -> list[str]:
+def build_pixi_shell_hook_args(
+    environment: str,
+    lockfile_mode: str = "locked",
+    *,
+    json: bool = True,
+    shell: str | None = None,
+) -> list[str]:
     """Build the `pixi shell-hook` argv used by the module."""
-    args = ["pixi", "shell-hook", "--locked", "--environment", environment]
+    args = ["pixi", "shell-hook", lockfile_mode_arg(lockfile_mode), "--environment", environment]
     if shell is not None:
         args.extend(["--shell", shell])
     if json:

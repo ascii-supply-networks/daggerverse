@@ -37,6 +37,7 @@ $ dagger install github.com/ascii-supply-networks/daggerverse/pixi
 
     ```console
     $ dagger call pixi install --environment default
+    $ dagger call pixi install --environment default --lockfile-mode frozen
     $ dagger call pixi install-environments --environments default --environments docs
     $ dagger call pixi runtime-environments --environments default --environments docs
     $ dagger call pixi run --args python --args --version
@@ -55,6 +56,8 @@ $ dagger install github.com/ascii-supply-networks/daggerverse/pixi
     ```
 
 Pass `--path` only when the source tree contains more than one Pixi workspace.
+Pass `--lockfile-mode frozen` when CI or image builds must fail on stale
+lockfiles instead of using the default `locked` mode.
 
 ## API Shape
 

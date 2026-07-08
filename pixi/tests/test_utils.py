@@ -9,6 +9,7 @@ from pixi.utils import (
     build_pixi_shell_hook_args,
     image_ref,
     is_excluded,
+    lockfile_mode_arg,
     normalize_environments,
     normalize_runtime_source_paths,
     parse_environments,
@@ -94,6 +95,10 @@ def test_build_install_args() -> None:
     assert build_pixi_install_args("default") == ["pixi", "install", "--locked", "--environment", "default"]
 
 
+def test_build_install_args_supports_frozen_mode() -> None:
+    assert build_pixi_install_args("default", "frozen") == ["pixi", "install", "--frozen", "--environment", "default"]
+
+
 def test_build_install_args_rejects_empty_environment() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         build_pixi_install_args("")
@@ -101,6 +106,11 @@ def test_build_install_args_rejects_empty_environment() -> None:
 
 def test_build_install_all_args() -> None:
     assert build_pixi_install_all_args() == ["pixi", "install", "--locked", "--all"]
+
+
+def test_lockfile_mode_rejects_unknown_mode() -> None:
+    with pytest.raises(ValueError, match=r"locked.*frozen"):
+        lockfile_mode_arg("update")
 
 
 def test_normalize_environments() -> None:
@@ -137,10 +147,10 @@ def test_build_lock_check_args() -> None:
 
 
 def test_build_run_args() -> None:
-    assert build_pixi_run_args(["python", "--version"], "dev") == [
+    assert build_pixi_run_args(["python", "--version"], "dev", "frozen") == [
         "pixi",
         "run",
-        "--locked",
+        "--frozen",
         "--environment",
         "dev",
         "python",
@@ -165,10 +175,10 @@ def test_build_shell_hook_args() -> None:
 
 
 def test_build_bash_shell_hook_args() -> None:
-    assert build_pixi_shell_hook_args("default", json=False, shell="bash") == [
+    assert build_pixi_shell_hook_args("default", "frozen", json=False, shell="bash") == [
         "pixi",
         "shell-hook",
-        "--locked",
+        "--frozen",
         "--environment",
         "default",
         "--shell",

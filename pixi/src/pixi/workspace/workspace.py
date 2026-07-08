@@ -5,7 +5,7 @@ import dagger
 from dagger import Doc, dag, field, function, object_type
 from dagger.telemetry import get_tracer
 
-from pixi.args import EnvironmentName, EnvironmentNames, PixiCommand, RuntimeSourcePaths
+from pixi.args import EnvironmentName, EnvironmentNames, LockfileMode, PixiCommand, RuntimeSourcePaths
 from pixi.utils import (
     _DEFAULT_VERSION,
     build_bash_entrypoint,
@@ -131,6 +131,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Install a Pixi environment from the committed lock file."""
         return await self.install_environments(
@@ -139,6 +140,7 @@ class PixiWorkspaceSource:
             pixi_version=pixi_version,
             image=image,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
 
     @function
@@ -161,6 +163,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Install selected Pixi environments into one container."""
         names = normalize_environments(environments)
@@ -174,7 +177,7 @@ class PixiWorkspaceSource:
                 dagger_codegen=dagger_codegen,
             )
             for environment in names:
-                args = build_pixi_install_args(environment)
+                args = build_pixi_install_args(environment, lockfile_mode)
                 span.add_event(
                     "pixi install environment", {"pixi.environment": environment, "pixi.install_args": " ".join(args)}
                 )
@@ -200,11 +203,12 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Install every Pixi environment declared by the lock file into one container."""
         with get_tracer().start_as_current_span("pixi install all") as span:
             span.set_attribute("workspace.path", self.path)
-            args = build_pixi_install_all_args()
+            args = build_pixi_install_all_args(lockfile_mode)
             span.set_attribute("pixi.install_args", " ".join(args))
             ctr = await self._install_base(
                 base_container=base_container,
@@ -246,6 +250,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Build a runtime container with one Pixi environment and no Pixi binary."""
         return await self.runtime_environments(
@@ -258,6 +263,7 @@ class PixiWorkspaceSource:
             image=image,
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
 
     @function
@@ -293,6 +299,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Build a runtime container with selected Pixi environments and no Pixi binary."""
         names = normalize_environments([entrypoint_environment, *environments])
@@ -302,6 +309,7 @@ class PixiWorkspaceSource:
             pixi_version=pixi_version,
             image=image,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
         return await self._runtime_from_builder(
             builder=builder,
@@ -311,6 +319,7 @@ class PixiWorkspaceSource:
             runtime_image=runtime_image,
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
 
     @function
@@ -345,6 +354,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Build a runtime container with every Pixi environment and no Pixi binary."""
         names = normalize_environments(await self.environments())
@@ -356,6 +366,7 @@ class PixiWorkspaceSource:
             pixi_version=pixi_version,
             image=image,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
         return await self._runtime_from_builder(
             builder=builder,
@@ -365,6 +376,7 @@ class PixiWorkspaceSource:
             runtime_image=runtime_image,
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
 
     async def _runtime_from_builder(
@@ -377,12 +389,13 @@ class PixiWorkspaceSource:
         runtime_image: str,
         runtime_source_paths: list[str] | None,
         dagger_codegen: bool,
+        lockfile_mode: str,
     ) -> dagger.Container:
         source = await self._source_with_codegen(dagger_codegen)
         workdir = self._workdir()
         source_paths = normalize_runtime_source_paths(runtime_source_paths)
         shell_hook = await builder.with_exec(
-            build_pixi_shell_hook_args(entrypoint_environment, json=False, shell="bash")
+            build_pixi_shell_hook_args(entrypoint_environment, lockfile_mode, json=False, shell="bash")
         ).stdout()
         runtime = runtime_base_container if runtime_base_container is not None else dag.container().from_(runtime_image)
         if source_paths == []:
@@ -451,6 +464,7 @@ class PixiWorkspaceSource:
             bool,
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
+        lockfile_mode: LockfileMode = "locked",
     ) -> dagger.Container:
         """Install the environment and run a command through `pixi run`."""
         ctr = await self.install(
@@ -459,8 +473,9 @@ class PixiWorkspaceSource:
             pixi_version=pixi_version,
             image=image,
             dagger_codegen=dagger_codegen,
+            lockfile_mode=lockfile_mode,
         )
-        command = build_pixi_run_args(args, environment)
+        command = build_pixi_run_args(args, environment, lockfile_mode)
         with get_tracer().start_as_current_span("pixi run") as span:
             span.set_attribute("pixi.run_args", command)
             return await ctr.with_exec(command).sync()
@@ -478,11 +493,12 @@ class PixiWorkspaceSource:
             str | None,
             Doc("Full Pixi image reference. Overrides `pixi_version`."),
         ] = None,
+        lockfile_mode: LockfileMode = "locked",
     ) -> str:
         """Return Pixi's activation shell hook for a named environment."""
         image_ref_value = await self._resolved_image(pixi_version, image)
         workdir = "/work" if self.path == "." else posixpath.join("/work", self.path)
-        args = build_pixi_shell_hook_args(environment, json=json)
+        args = build_pixi_shell_hook_args(environment, lockfile_mode, json=json)
         return await (
             dag.container()
             .from_(image_ref_value)

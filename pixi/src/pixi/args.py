@@ -51,6 +51,11 @@ RuntimeSourcePaths: TypeAlias = Annotated[
     Doc("Relative source paths or glob patterns to copy into the runtime image."),
 ]
 
+LockfileMode: TypeAlias = Annotated[
+    str,
+    Doc("Pixi lockfile mode for install, run, and shell-hook: `locked` or `frozen`. Defaults to `locked`."),
+]
+
 PixiCommand: TypeAlias = Annotated[
     list[str],
     Doc("Command argv passed to `pixi run`."),
