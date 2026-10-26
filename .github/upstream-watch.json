@@ -2,8 +2,8 @@
   "upstream": {
     "repository": "typesafe-ai/daggerverse",
     "branch": "main",
-    "base_commit": "7d07d8e68eb0678f2b022689cc191b82a5505053",
-    "base_note": "ci: fix daggerverse publish (#69), ported to this repo"
+    "base_commit": "77e6c9f779968f1d4cfacbc46061f054750a9cc8",
+    "base_note": "fix(ruff): fail fix() on ruff errors (#114); earlier commits ported or skipped as uv/ruff-specific. Dagger 1.0 beta / Workspace API (#116 onward) not ported yet."
   },
   "tracking_issue": {
     "title": "Review upstream typesafe-ai/daggerverse updates",

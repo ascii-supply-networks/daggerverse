@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pixi.utils import parse_environments, parse_requires_pixi
+from pixi.utils import needs_dagger_codegen, parse_environments, parse_requires_pixi
 
 FIXTURES = Path(__file__).parent / "_packages"
 
@@ -20,3 +20,8 @@ def test_pyproject_fixture_manifest() -> None:
     content = (FIXTURES / "pyproject" / "pyproject.toml").read_text(encoding="utf-8")
     assert parse_requires_pixi(content, "pyproject.toml") == "==0.70.1"
     assert parse_environments(content, "pyproject.toml") == ["default", "docs"]
+
+
+def test_dagger_module_fixture_uses_pypi_dagger_io() -> None:
+    content = (FIXTURES / "dagger-module" / "pyproject.toml").read_text(encoding="utf-8")
+    assert not needs_dagger_codegen(content, "pyproject.toml")

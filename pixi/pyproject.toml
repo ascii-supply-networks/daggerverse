@@ -6,9 +6,17 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
+    "anyio",
     "dagger-io",
+    "opentelemetry-api",
     "packaging>=26.2",
 ]
+
+# Map distributions to the import packages they ship, so deptry doesn't flag
+# those imports as missing/unused.
+[tool.deptry.package_module_name_map]
+dagger-io = "dagger"
+opentelemetry-api = "opentelemetry"
 
 [build-system]
 requires = ["hatchling"]

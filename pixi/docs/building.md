@@ -155,9 +155,33 @@ For a nested Pixi workspace, include the workspace prefix when needed.
 
 ## Choosing images
 
-The default builder image is `ghcr.io/prefix-dev/pixi:0.70.2`, or the concrete
-version resolved from `requires-pixi` when the workspace declares one. Pass
-`pixi_version` or `image` to override it.
+The default builder image is pinned in
+[`pixi/src/pixi/images/pixi/Dockerfile`](https://github.com/ascii-supply-networks/daggerverse/blob/main/pixi/src/pixi/images/pixi/Dockerfile)
+and kept current by Dependabot. When the workspace declares `requires-pixi`, the
+module uses the concrete version resolved from it instead. Pass `pixi_version` or
+`image` to override it.
+
+Pass `base_container` when the builder needs system packages, private registry
+auth, or another platform. If that base doesn't ship `pixi`, the module copies
+the static binary from the official image to `/usr/local/bin/pixi`
+(`auto_install_pixi=True` by default). You can also call
+`workspace(...).with_pixi(container)` yourself. The base still needs `sh` and CA
+certificates for Pixi to download packages.
+
+## Caching
+
+By default, the module mounts a Dagger cache volume at `/mnt/cache/pixi` and sets
+`PIXI_CACHE_DIR` to point there. Conda packages, repodata, and PyPI downloads are
+then shared across builds, so a second install that hits the same versions skips
+the network.
+
+If your `base_container` already sets `PIXI_CACHE_DIR` and has no populated
+directory there, the module mounts the cache volume at that path instead. A base
+that ships a warm cache at `PIXI_CACHE_DIR` is left untouched.
+
+The cache volume is emptied after an install once it grows past `max_cache_size`
+GiB (100 by default). Pass `prune_cache=False` to disable this, or
+`max_cache_size=0` to prune after every install.
 
 The default runtime image is `ubuntu:noble`. Pass `runtime_image` or
 `runtime_base_container` when the final image needs operating-system packages,
@@ -167,5 +191,7 @@ users, certificates, or another base.
 
 If the workspace is itself a Dagger module, the module runs Dagger codegen and
 overlays the generated SDK before installing, so the generated `dagger-io` package
-is present even when `sdk/` is gitignored in CI. This is on by default and is a
-no-op for non-Dagger projects.
+is present even when `sdk/` is gitignored in CI. Codegen only runs when the
+workspace has a `dagger.json` *and* its Pixi manifest sources `dagger-io` from a
+local `sdk` path (in `pypi-dependencies` or a feature's `pypi-dependencies`).
+A `dagger-io` installed from PyPI skips it. This is on by default.

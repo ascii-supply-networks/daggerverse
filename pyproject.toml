@@ -67,6 +67,7 @@ prek = ">=0.5.7,<0.6"
 ruff = ">=0.17.2,<0.18"
 pinact = ">=5.0.2,<6"
 zizmor = ">=1.31.1,<2"
+deptry = ">=0.25.1,<0.26"
 
 [tool.pixi.environments]
 secops-audit = { features = ["secops-audit"], no-default-feature = true, solve-group = "secops-audit" }
@@ -85,3 +86,6 @@ pre-commit-run = "pixi run -e pre-commit --frozen prek"
 pre-commit-run-all = "pixi run -e pre-commit --frozen prek run --all-files"
 pin-actions = "pixi run -e pre-commit --frozen pinact run --fix=false --no-api"
 audit-github-actions = "pixi run -e pre-commit --frozen zizmor --offline .github"
+deptry-pixi = "pixi run -e pre-commit --frozen deptry --config pixi/pyproject.toml --extend-exclude sdk pixi/src"
+deptry-dagger = "pixi run -e pre-commit --frozen deptry --config .dagger/pyproject.toml --known-first-party ascii_daggerverse --extend-exclude sdk .dagger"
+check-deps = { depends-on = ["deptry-pixi", "deptry-dagger"] }

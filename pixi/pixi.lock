@@ -1777,7 +1777,9 @@ packages:
 - pypi: ./
   name: pixi
   requires_dist:
+  - anyio
   - dagger-io
+  - opentelemetry-api
   - packaging>=26.2
   requires_python: '>=3.13'
 - pypi: https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl

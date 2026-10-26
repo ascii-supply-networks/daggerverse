@@ -35,3 +35,44 @@ jobs:
         env:
           MODULE: ${{ steps.meta.outputs.module }}
           DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
+
+  release:
+    name: release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Extract module and version from tag
+        id: meta
+        run: |
+          echo "module=${GITHUB_REF_NAME%%/v*}" >> "$GITHUB_OUTPUT"
+          echo "version=${GITHUB_REF_NAME#*/}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@a9a95522b26fe6403f7bb24031f21fb573d0f5ff # v4.9.1
+        env:
+          OUTPUT: ${{ runner.temp }}/changelog.md
+          GITHUB_REPO: ${{ github.repository }}
+        with:
+          config: cliff.toml
+          args: --current --strip header --tag-pattern "${{ steps.meta.outputs.module }}/v.*" --include-path "${{ steps.meta.outputs.module }}/**/*"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          MODULE: ${{ steps.meta.outputs.module }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          BODY: ${{ steps.changelog.outputs.content }}
+        run: |
+          gh release create "${TAG}" \
+            --title "${MODULE} ${VERSION}" \
+            --notes "${BODY}"

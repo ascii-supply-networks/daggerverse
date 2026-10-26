@@ -17,5 +17,7 @@ hooks = [
     { id = "ruff-check", name = "Ruff check", entry = "ruff check --fix", language = "system", types_or = ["python", "pyi"] },
     { id = "ruff-format", name = "Ruff format", entry = "ruff format", language = "system", types_or = ["python", "pyi"] },
     { id = "pinact", name = "Pin GitHub Actions", entry = "pinact run --fix=false --no-api", language = "system", pass_filenames = false, files = "^\\.github/" },
+    { id = "deptry-pixi", name = "deptry (pixi)", entry = "deptry --config pixi/pyproject.toml --extend-exclude sdk pixi/src", language = "system", pass_filenames = false, files = "^pixi/(src/.*\\.py|pyproject\\.toml)$" },
+    { id = "deptry-dagger", name = "deptry (.dagger)", entry = "deptry --config .dagger/pyproject.toml --known-first-party ascii_daggerverse --extend-exclude sdk .dagger", language = "system", pass_filenames = false, files = "^\\.dagger/.*(\\.py|pyproject\\.toml)$" },
     { id = "zizmor", name = "Audit GitHub Actions", entry = "zizmor --offline .github", language = "system", pass_filenames = false, files = "^\\.github/" },
 ]

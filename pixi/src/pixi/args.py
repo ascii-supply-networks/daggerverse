@@ -60,3 +60,21 @@ PixiCommand: TypeAlias = Annotated[
     list[str],
     Doc("Command argv passed to `pixi run`."),
 ]
+
+AutoInstallPixi: TypeAlias = Annotated[
+    bool,
+    Doc(
+        "Install the Pixi binary when it is not already on $PATH of `base_container`. "
+        "Set to False if your base container already ships Pixi."
+    ),
+]
+
+PruneCache: TypeAlias = Annotated[
+    bool,
+    Doc("Empty the shared Pixi cache volume after installing once it grows past `max_cache_size`."),
+]
+
+MaxCacheSize: TypeAlias = Annotated[
+    int,
+    Doc("Prune the Pixi cache only once it grows past this many GiB. `0` prunes on every build."),
+]
