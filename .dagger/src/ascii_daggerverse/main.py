@@ -28,7 +28,7 @@ _ZENSICAL_GLOB = "*/zensical.toml"
 
 
 def _base() -> dagger.Container:
-    return dag.container().from_("ghcr.io/prefix-dev/pixi:0.70.2").with_workdir("/workspace")
+    return dag.container().from_("ghcr.io/prefix-dev/pixi:0.83.0").with_workdir("/workspace")
 
 
 @object_type
@@ -49,8 +49,8 @@ class AsciiDaggerverse:
         ctr = (
             _base()
             .with_directory("/workspace", self.source)
-            .with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
-            .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
+            .with_env_variable("PIXI_CACHE_DIR", "/mnt/cache/pixi")
+            .with_mounted_cache("/mnt/cache/pixi", dag.cache_volume("pixi-cache"))
             .with_env_variable("PIXI_NO_PROGRESS", "true")
         )
         await (
@@ -67,8 +67,8 @@ class AsciiDaggerverse:
         ctr = (
             _base()
             .with_directory("/workspace", self.source)
-            .with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
-            .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
+            .with_env_variable("PIXI_CACHE_DIR", "/mnt/cache/pixi")
+            .with_mounted_cache("/mnt/cache/pixi", dag.cache_volume("pixi-cache"))
             .with_env_variable("PIXI_NO_PROGRESS", "true")
         )
         combined = await self._zensical_site(ctr, _LANDING_PROJECT)

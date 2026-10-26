@@ -7,10 +7,13 @@ from dagger.telemetry import get_tracer
 from opentelemetry.trace import Status, StatusCode
 
 from pixi.args import (
+    AutoInstallPixi,
     EnvironmentName,
     EnvironmentNames,
     LockfileMode,
+    MaxCacheSize,
     PixiCommand,
+    PruneCache,
     RuntimeSourcePaths,
     SourceDir,
     WorkspacePath,
@@ -68,6 +71,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install one Pixi environment into a builder container."""
         return await self.workspace(path).install(
@@ -77,6 +83,9 @@ class Pixi:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -101,6 +110,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install selected Pixi environments into the same builder container."""
         return await self.workspace(path).install_environments(
@@ -110,6 +122,9 @@ class Pixi:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -133,6 +148,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install every Pixi environment into the same builder container."""
         return await self.workspace(path).install_all_environments(
@@ -141,6 +159,9 @@ class Pixi:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -177,6 +198,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with one Pixi environment and no Pixi binary."""
         return await self.workspace(path).runtime(
@@ -189,6 +213,9 @@ class Pixi:
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -226,6 +253,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with selected Pixi environments and no Pixi binary."""
         return await self.workspace(path).runtime_environments(
@@ -239,6 +269,9 @@ class Pixi:
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -275,6 +308,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with every Pixi environment and no Pixi binary."""
         return await self.workspace(path).runtime_all_environments(
@@ -287,6 +323,9 @@ class Pixi:
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -312,6 +351,9 @@ class Pixi:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install one environment and run a command through Pixi."""
         return await self.workspace(path).run(
@@ -322,6 +364,9 @@ class Pixi:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function

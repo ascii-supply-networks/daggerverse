@@ -1,7 +1,10 @@
 import pytest
 
 from pixi.utils import (
+    _DEFAULT_IMAGE,
+    _DEFAULT_VERSION,
     build_bash_entrypoint,
+    build_cache_prune_script,
     build_pixi_install_all_args,
     build_pixi_install_args,
     build_pixi_lock_check_args,
@@ -10,10 +13,12 @@ from pixi.utils import (
     image_ref,
     is_excluded,
     lockfile_mode_arg,
+    needs_dagger_codegen,
     normalize_environments,
     normalize_runtime_source_paths,
     parse_environments,
     parse_requires_pixi,
+    pinned_image,
     resolve_specifier,
     workspace_path,
 )
@@ -43,7 +48,52 @@ def test_resolve_range_requires_pixi() -> None:
 
 
 def test_resolve_upper_bound_only_falls_back_to_default() -> None:
-    assert resolve_specifier("<0.71") == "0.70.2"
+    assert resolve_specifier("<0.71") == _DEFAULT_VERSION
+
+
+def test_default_image_is_pinned_in_dockerfile() -> None:
+    assert pinned_image("pixi") == f"{_DEFAULT_IMAGE}:{_DEFAULT_VERSION}"
+    assert _DEFAULT_IMAGE == "ghcr.io/prefix-dev/pixi"
+    assert _DEFAULT_VERSION != "latest"
+
+
+def test_needs_dagger_codegen_for_local_sdk_source() -> None:
+    content = """
+[tool.pixi.pypi-dependencies]
+dagger-io = { path = "sdk", editable = true }
+"""
+    assert needs_dagger_codegen(content, "pyproject.toml")
+    assert needs_dagger_codegen('[pypi-dependencies]\ndagger-io = { path = "./sdk/" }\n', "pixi.toml")
+
+
+def test_needs_dagger_codegen_checks_features() -> None:
+    content = """
+[feature.dagger.pypi-dependencies]
+dagger-io = { path = "sdk" }
+"""
+    assert needs_dagger_codegen(content, "pixi.toml")
+
+
+def test_needs_dagger_codegen_skips_pypi_dagger_io() -> None:
+    assert not needs_dagger_codegen('[pypi-dependencies]\ndagger-io = ">=0.21"\n', "pixi.toml")
+    assert not needs_dagger_codegen('[pypi-dependencies]\ndagger-io = { path = "vendor/sdk" }\n', "pixi.toml")
+    assert not needs_dagger_codegen("[workspace]\n", "pixi.toml")
+
+
+def test_build_cache_prune_script_is_size_gated() -> None:
+    script = build_cache_prune_script("/mnt/cache/pixi", 100)
+    assert '[ "${used_kib:-0}" -gt 104857600 ]' in script
+    assert 'du -skx "$cache_dir"' in script
+    assert 'find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +' in script
+
+
+def test_build_cache_prune_script_zero_always_prunes() -> None:
+    assert "if true; then" in build_cache_prune_script("/mnt/cache/pixi", 0)
+
+
+def test_build_cache_prune_script_rejects_negative_size() -> None:
+    with pytest.raises(ValueError, match="negative"):
+        build_cache_prune_script("/mnt/cache/pixi", -1)
 
 
 def test_parse_requires_pixi_from_pixi_toml() -> None:

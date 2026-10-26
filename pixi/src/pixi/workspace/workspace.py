@@ -5,10 +5,22 @@ import dagger
 from dagger import Doc, dag, field, function, object_type
 from dagger.telemetry import get_tracer
 
-from pixi.args import EnvironmentName, EnvironmentNames, LockfileMode, PixiCommand, RuntimeSourcePaths
+from pixi.args import (
+    AutoInstallPixi,
+    EnvironmentName,
+    EnvironmentNames,
+    LockfileMode,
+    MaxCacheSize,
+    PixiCommand,
+    PruneCache,
+    RuntimeSourcePaths,
+)
 from pixi.utils import (
     _DEFAULT_VERSION,
+    _PIXI_BIN,
+    _PIXI_CACHE_DIR,
     build_bash_entrypoint,
+    build_cache_prune_script,
     build_pixi_install_all_args,
     build_pixi_install_args,
     build_pixi_lock_check_args,
@@ -77,24 +89,101 @@ class PixiWorkspaceSource:
         pixi_version: str | None,
         image: str | None,
         dagger_codegen: bool,
+        auto_install_pixi: bool,
     ) -> dagger.Container:
         source = await self._source_with_codegen(dagger_codegen)
-        image_ref_value = await self._resolved_image(pixi_version, image)
-        ctr = base_container if base_container is not None else dag.container().from_(image_ref_value)
-        workdir = "/work" if self.path == "." else posixpath.join("/work", self.path)
+        if base_container is None:
+            ctr = dag.container().from_(await self._resolved_image(pixi_version, image))
+        else:
+            ctr = base_container
+            if auto_install_pixi and not await self._has_pixi(ctr):
+                ctr = await self.with_pixi(ctr, pixi_version=pixi_version, image=image)
+        ctr = await self._with_cache(ctr)
         return (
-            ctr.with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
-            .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
-            .with_directory("/work", source)
-            .with_workdir(workdir)
+            ctr.with_directory("/work", source)
+            .with_workdir(self._workdir())
             .with_env_variable("PIXI_NO_PROGRESS", "true")
         )
+
+    @staticmethod
+    async def _has_pixi(ctr: dagger.Container) -> bool:
+        """Check whether pixi is on $PATH in the given container."""
+        with get_tracer().start_as_current_span("detect pixi on PATH") as span:
+            exit_code = await ctr.with_exec(["sh", "-c", "command -v pixi"], expect=dagger.ReturnType.ANY).exit_code()
+            found = exit_code == 0
+            span.set_attribute("pixi.found", found)
+            return found
+
+    @staticmethod
+    async def _has_cache(ctr: dagger.Container, path: str) -> bool:
+        """Whether `path` already holds a populated Pixi cache in the container.
+
+        A deliberately prepared base may ship a warm cache baked at `PIXI_CACHE_DIR`;
+        mounting an empty volume over it would hide it.
+        """
+        try:
+            return len(await ctr.directory(path).entries()) > 0
+        except dagger.DaggerError:
+            return False
+
+    async def _with_cache(self, ctr: dagger.Container) -> dagger.Container:
+        """Point Pixi at the shared cache volume.
+
+        Pixi keeps conda packages, repodata, and PyPI downloads under
+        `PIXI_CACHE_DIR`. A base that already sets it gets the volume mounted at
+        that path unless it ships a populated cache there.
+        """
+        cache_dir = await ctr.env_variable("PIXI_CACHE_DIR")
+        if cache_dir:
+            if not await self._has_cache(ctr, cache_dir):
+                ctr = ctr.with_mounted_cache(cache_dir, dag.cache_volume("pixi-cache"))
+            return ctr
+        return ctr.with_env_variable("PIXI_CACHE_DIR", _PIXI_CACHE_DIR).with_mounted_cache(
+            _PIXI_CACHE_DIR, dag.cache_volume("pixi-cache")
+        )
+
+    @staticmethod
+    async def _prune_cache(ctr: dagger.Container, max_cache_size: int) -> dagger.Container:
+        script = build_cache_prune_script("${PIXI_CACHE_DIR}", max_cache_size)
+        with get_tracer().start_as_current_span("prune pixi cache") as span:
+            span.set_attribute("pixi.cache_max_size_gib", max_cache_size)
+            executed = ctr.with_exec(["sh", "-c", script])
+            ctr = await executed.sync()
+            # The gate reports on stderr what was measured; surface it on the span.
+            summary = (await executed.stderr()).strip()
+            if summary:
+                span.set_attribute("pixi.cache_prune_summary", summary)
+        return ctr
 
     def _workdir(self) -> str:
         return "/work" if self.path == "." else posixpath.join("/work", self.path)
 
     def _env_dir(self, environment: str) -> str:
         return posixpath.join(self._workdir(), ".pixi", "envs", environment)
+
+    @function
+    async def with_pixi(
+        self,
+        container: Annotated[dagger.Container, Doc("Container to install the Pixi binary into.")],
+        pixi_version: Annotated[
+            str | None,
+            Doc("Pixi version to install. Defaults to the version detected from the workspace."),
+        ] = None,
+        image: Annotated[
+            str | None,
+            Doc("Full Pixi image reference to copy the binary from. Overrides `pixi_version`."),
+        ] = None,
+    ) -> dagger.Container:
+        """Copy the Pixi binary into a container.
+
+        Useful with a custom `base_container` that doesn't ship Pixi. Copies the
+        static binary from the official image to `/usr/local/bin/pixi`.
+        """
+        image_ref_value = await self._resolved_image(pixi_version, image)
+        with get_tracer().start_as_current_span("install pixi binary") as span:
+            span.set_attribute("pixi.image", image_ref_value)
+            pixi_bin = dag.container().from_(image_ref_value).file(_PIXI_BIN)
+            return await container.with_file(_PIXI_BIN, pixi_bin, permissions=0o755).sync()
 
     @function
     async def pixi_version(self) -> str:
@@ -132,6 +221,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install a Pixi environment from the committed lock file."""
         return await self.install_environments(
@@ -141,6 +233,9 @@ class PixiWorkspaceSource:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -164,6 +259,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install selected Pixi environments into one container."""
         names = normalize_environments(environments)
@@ -175,6 +273,7 @@ class PixiWorkspaceSource:
                 pixi_version=pixi_version,
                 image=image,
                 dagger_codegen=dagger_codegen,
+                auto_install_pixi=auto_install_pixi,
             )
             for environment in names:
                 args = build_pixi_install_args(environment, lockfile_mode)
@@ -182,7 +281,10 @@ class PixiWorkspaceSource:
                     "pixi install environment", {"pixi.environment": environment, "pixi.install_args": " ".join(args)}
                 )
                 ctr = ctr.with_exec(args)
-            return await ctr.sync()
+            ctr = await ctr.sync()
+        if prune_cache:
+            ctr = await self._prune_cache(ctr, max_cache_size)
+        return ctr
 
     @function
     async def install_all_environments(
@@ -204,6 +306,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install every Pixi environment declared by the lock file into one container."""
         with get_tracer().start_as_current_span("pixi install all") as span:
@@ -215,8 +320,12 @@ class PixiWorkspaceSource:
                 pixi_version=pixi_version,
                 image=image,
                 dagger_codegen=dagger_codegen,
+                auto_install_pixi=auto_install_pixi,
             )
-            return await ctr.with_exec(args).sync()
+            ctr = await ctr.with_exec(args).sync()
+        if prune_cache:
+            ctr = await self._prune_cache(ctr, max_cache_size)
+        return ctr
 
     @function
     async def runtime(
@@ -251,6 +360,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with one Pixi environment and no Pixi binary."""
         return await self.runtime_environments(
@@ -264,6 +376,9 @@ class PixiWorkspaceSource:
             runtime_source_paths=runtime_source_paths,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
 
     @function
@@ -300,6 +415,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with selected Pixi environments and no Pixi binary."""
         names = normalize_environments([entrypoint_environment, *environments])
@@ -310,6 +428,9 @@ class PixiWorkspaceSource:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
         return await self._runtime_from_builder(
             builder=builder,
@@ -355,6 +476,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Build a runtime container with every Pixi environment and no Pixi binary."""
         names = normalize_environments(await self.environments())
@@ -367,6 +491,9 @@ class PixiWorkspaceSource:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
         return await self._runtime_from_builder(
             builder=builder,
@@ -431,12 +558,9 @@ class PixiWorkspaceSource:
             workdir = "/work" if self.path == "." else posixpath.join("/work", self.path)
             args = build_pixi_lock_check_args()
             span.set_attribute("pixi.lock_args", args)
+            ctr = await self._with_cache(dag.container().from_(image_ref_value))
             await (
-                dag.container()
-                .from_(image_ref_value)
-                .with_mounted_cache("/root/.cache/rattler/cache", dag.cache_volume("pixi-rattler-cache"))
-                .with_mounted_cache("/root/.cache/pixi", dag.cache_volume("pixi-cache"))
-                .with_directory("/work", source)
+                ctr.with_directory("/work", source)
                 .with_workdir(workdir)
                 .with_env_variable("PIXI_NO_PROGRESS", "true")
                 .with_exec(args)
@@ -465,6 +589,9 @@ class PixiWorkspaceSource:
             Doc("Run Dagger codegen and overlay sdk/ when the workspace is a Dagger module."),
         ] = True,
         lockfile_mode: LockfileMode = "locked",
+        auto_install_pixi: AutoInstallPixi = True,
+        prune_cache: PruneCache = True,
+        max_cache_size: MaxCacheSize = 100,
     ) -> dagger.Container:
         """Install the environment and run a command through `pixi run`."""
         ctr = await self.install(
@@ -474,6 +601,9 @@ class PixiWorkspaceSource:
             image=image,
             dagger_codegen=dagger_codegen,
             lockfile_mode=lockfile_mode,
+            auto_install_pixi=auto_install_pixi,
+            prune_cache=prune_cache,
+            max_cache_size=max_cache_size,
         )
         command = build_pixi_run_args(args, environment, lockfile_mode)
         with get_tracer().start_as_current_span("pixi run") as span:

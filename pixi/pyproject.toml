@@ -6,9 +6,17 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.13"
 dependencies = [
+    "anyio",
     "dagger-io",
+    "opentelemetry-api",
     "packaging>=26.2",
 ]
+
+# Map distributions to the import packages they ship, so deptry doesn't flag
+# those imports as missing/unused.
+[tool.deptry.package_module_name_map]
+dagger-io = "dagger"
+opentelemetry-api = "opentelemetry"
 
 [build-system]
 requires = ["hatchling"]
@@ -21,13 +29,13 @@ requires-pixi = ">=0.70.0"
 
 [tool.pixi.dependencies]
 python = ">=3.13,<3.15"
-pytest = ">=9.0.3,<10"
+pytest = ">=9.1.1,<10"
 
 [tool.pixi.pypi-dependencies]
 pixi = { path = ".", editable = true }
-dagger-io = ">=0.21.4"
+dagger-io = ">=0.21.11,<0.22"
 packaging = ">=26.2"
-ruff = ">=0.14.8,<0.15"
+ruff = ">=0.17.2,<0.18"
 
 [tool.pixi.tasks]
 test = "python -m pytest -q"

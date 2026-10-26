@@ -3,14 +3,28 @@
 import posixpath
 import re
 import tomllib
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-_DEFAULT_IMAGE = "ghcr.io/prefix-dev/pixi"
-_DEFAULT_VERSION = "0.70.2"
+_PIXI_CACHE_DIR = "/mnt/cache/pixi"
+_PIXI_BIN = "/usr/local/bin/pixi"
 _VERSION_SPECIFIER_RE = re.compile(r"[><=!~]")
+
+
+def pinned_image(name: str) -> str:
+    """The image reference in `images/<name>/Dockerfile`, which Dependabot keeps current."""
+    dockerfile = Path(__file__).resolve().parent / "images" / name / "Dockerfile"
+    for line in dockerfile.read_text().splitlines():
+        if line.startswith("FROM "):
+            return line.split()[1]
+    msg = f"no FROM line in {dockerfile}"
+    raise ValueError(msg)
+
+
+# The Pixi image and version used when a workspace doesn't declare `requires-pixi`.
+_DEFAULT_IMAGE, _DEFAULT_VERSION = pinned_image("pixi").rsplit(":", 1)
 
 
 def image_ref(version: str) -> str:
@@ -82,6 +96,29 @@ def parse_requires_pixi(content: str, manifest_name: str) -> str | None:
     if isinstance(value, str):
         return value
     return None
+
+
+def _is_local_sdk_source(spec: object) -> bool:
+    if not isinstance(spec, dict):
+        return False
+    path = spec.get("path")
+    return isinstance(path, str) and path.strip().removeprefix("./").rstrip("/") == "sdk"
+
+
+def needs_dagger_codegen(content: str, manifest_name: str) -> bool:
+    """Whether a Pixi manifest sources `dagger-io` from a local `sdk` directory.
+
+    Checks the workspace-level and every feature's `pypi-dependencies`. A
+    `dagger-io` installed from PyPI does not need the generated SDK overlay.
+    """
+    manifest = parse_manifest(content, manifest_name)
+    tables = [manifest.get("pypi-dependencies", {})]
+    features = manifest.get("feature", {})
+    if isinstance(features, dict):
+        tables.extend(
+            feature.get("pypi-dependencies", {}) for feature in features.values() if isinstance(feature, dict)
+        )
+    return any(isinstance(table, dict) and _is_local_sdk_source(table.get("dagger-io")) for table in tables)
 
 
 def parse_environments(content: str, manifest_name: str) -> list[str]:
@@ -191,3 +228,28 @@ def build_pixi_shell_hook_args(
 def build_bash_entrypoint(shell_hook: str) -> str:
     """Build a Bash entrypoint that activates a Pixi environment without Pixi."""
     return f'#!/usr/bin/env bash\nset -euo pipefail\n{shell_hook.rstrip()}\nexec "$@"\n'
+
+
+def build_cache_prune_script(cache_dir: str, max_cache_size: int) -> str:
+    """Shell script that empties the Pixi cache once it grows past `max_cache_size` GiB.
+
+    The size check and the prune run in one exec so the live cache volume is
+    measured each time the step runs. `max_cache_size=0` prunes on every build.
+    The cache directory itself is kept because it is usually a mount point.
+    """
+    if max_cache_size < 0:
+        msg = "max_cache_size must not be negative."
+        raise ValueError(msg)
+    limit_kib = max_cache_size * 1024 * 1024  # GiB -> KiB, to compare with `du -sk`
+    gate = f'[ "${{used_kib:-0}}" -gt {limit_kib} ]' if max_cache_size > 0 else "true"
+    # `-x` keeps du on the cache mount's own filesystem.
+    return (
+        f'cache_dir="{cache_dir}"; '
+        'used_kib=$(du -skx "$cache_dir" 2>/dev/null | cut -f1 || echo 0); '
+        f"if {gate}; then "
+        f'echo "pixi cache: ${{used_kib}} KiB used > {limit_kib} KiB limit; pruning" >&2; '
+        'find "$cache_dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} +; '
+        "else "
+        f'echo "pixi cache: ${{used_kib}} KiB used <= {limit_kib} KiB limit; skipping prune" >&2; '
+        "fi"
+    )

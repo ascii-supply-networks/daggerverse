@@ -1,0 +1,37 @@
+[changelog]
+body = """
+{% if message %}
+{{ message }}
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | split(pat="\n") | first | trim }}\
+{% if commit.remote.username %} by @{{ commit.remote.username }}{% endif %}
+{%- endfor %}
+{% endfor %}
+"""
+trim = true
+
+[git]
+tag_pattern = ".*/v[0-9].*"
+conventional_commits = true
+filter_unconventional = false
+commit_preprocessors = [
+  { pattern = '\(#(\d+)\)', replace = "([#${1}](https://github.com/ascii-supply-networks/daggerverse/pull/${1}))" },
+]
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^chore", group = "Miscellaneous" },
+  { message = "^test", group = "Testing" },
+  { message = "^ci", group = "CI" },
+  { message = "^style", skip = true },
+]
+
+[remote.github]
+owner = "ascii-supply-networks"
+repo = "daggerverse"

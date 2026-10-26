@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 from urllib.request import urlopen
 
-DEFAULT_DAGGER_VERSION = "0.21.4"
+DEFAULT_DAGGER_VERSION = "0.21.11"
 RELEASE_BASE_URL = "https://github.com/dagger/dagger/releases/download"
 
 
